@@ -7,15 +7,15 @@ import torch.nn.functional as F
 from replay_memory import ReplayMemory, Transition
 from GAN import Discriminator, GAN
 
-#device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-device = 'cpu'
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#device = 'cpu'
 
 class DQN_net(nn.Module):
     def __init__(self, n_observations, n_actions):
         super(DQN_net, self).__init__()
         self.model = nn.Sequential(
             nn.Linear(n_observations, 64),
-            nn.ReLU(),
+            nn.ReLU(device),
             nn.Linear(64, 128),
             nn.ReLU(),
             nn.Linear(128, 256),
@@ -23,7 +23,7 @@ class DQN_net(nn.Module):
             nn.Linear(256, 128),
             nn.ReLU(),
             nn.Linear(128, n_actions)
-        )
+        ).to(device)
 
     def forward(self, x):
         return self.model(x)
@@ -114,9 +114,10 @@ class DQN_D(DQN):
         self.beta = beta
         self.discrm_criterion = nn.BCELoss()
         self.discrm_upd_freq = discrm_update_freq
+        self.n_states = n_states
 
     def optimize(self, sa_vals, exp_sa_vals):
-        x_real = F.one_hot(self.sns.cpu().squeeze(1).long()-1, num_classes=10).float().to(device)
+        x_real = F.one_hot(self.sns.cpu().squeeze(1).long()-1, num_classes=self.n_states).float().to(device)
         x_fake = torch.randn(x_real.size(), device=device)
 
         pred_real, pred_fake = self.D.step(x_real, x_fake)
@@ -136,9 +137,10 @@ class DQN_GAEX(DQN):
         self.beta = beta
         self.gan_criterion = nn.BCELoss()
         self.gan_upd_freq = gan_upd_freq
+        self.n_states = n_states
 
     def optimize(self, sa_vals, exp_sa_vals):
-        x_real = F.one_hot(self.sns.cpu().squeeze(1).long()-1, num_classes=10).float().to(device)
+        x_real = F.one_hot(self.sns.cpu().squeeze(1).long()-1, num_classes=self.n_states).float().to(device)
         pred_real, pred_fake, x_fake = self.GAN.step(x_real)
 
         r_intr = (self.beta * (1 - pred_real.detach())**2).squeeze(1).to(device)
